@@ -1,237 +1,234 @@
-from math import log
+from numpy import log10 as log
+
+from fluids import friction_factor
 
 from .utils import PropertiesOfWholeSystem as Prop
 from .k_part_utils import PropertiesOfPart
-from fluids import roughness_Farshad, friction_factor
-
-
-# здесь совсем не совпадает со статье что-то,
-# там сто проц ошибка в Г и квадратные скобки это целое?
 
 
 class Orkiszewski:
+    # This class implemented follows the paper by Orkiszewski (1967)
     # ====== Model - Extended Griffith and Wallis method by Orkiszewski =======
-    #  The models implemented follows the paper by Orkiszewski (1967)
     @staticmethod
-    def slug(pk: PropertiesOfPart) -> tuple[float, float]:
+    def slug(p_k: PropertiesOfPart) -> tuple[float, float]:
+        """Get average density and friction-loss term for slug case"""
         # The following equations are in the Appendix C, SLUG FLOW.
         # Calculation of bubble rise velocity variants
-        # to find correct one(C-7, C-8 according to the paper)
-        bubble_vel3000 = ((0.546 + 8.74 * 10**-6 * pk.n_re)
-                          * (Prop.g * Prop.d_h) ** 0.5)
-        bubble_vel8000 = ((0.35 + 8.74 * 10**-6 * pk.n_re)
-                          * (Prop.g * Prop.d_h) ** 0.5)
+        n_re_t = 1488 * p_k.ro_l * Prop.d_h * p_k.v_t / p_k.oil_mu
+        moody_friction_t = friction_factor(n_re_t, Prop.rel_rough)
+        v_b3000 = ((0.546 + 8.74 * 10**-6 * n_re_t)
+                   * (Prop.g * Prop.d_h) ** 0.5)
+        v_b8000 = ((0.35 + 8.74 * 10**-6 * n_re_t)
+                   * (Prop.g * Prop.d_h) ** 0.5)
         # Functions of bubble Reynolds number for different bubble
         # rise velocities(N_b = 1.488 * v_b * d_h * ro_l/mu_L)
-        n_re_b1 = 1488 * bubble_vel3000 * Prop.d_h * pk.ro_l / pk.oil_mu
-        n_re_b2 = 1488 * bubble_vel8000 * Prop.d_h * pk.ro_l / pk.oil_mu
-
+        n_re_b1 = 1488 * v_b3000 * Prop.d_h * p_k.ro_l / p_k.oil_mu
+        n_re_b2 = 1488 * v_b8000 * Prop.d_h * p_k.ro_l / p_k.oil_mu
         # Check what relationship we should use as
         # correct bubble rise velocity v_b
         if n_re_b1 <= 3000:
-            bubble_vel = bubble_vel3000
+            v_b = v_b3000
         elif n_re_b2 >= 8000:
-            bubble_vel = bubble_vel8000
+            v_b = v_b8000
         else:
-            bubble_vel_between = ((0.251 + 8.74 * 10**-6 * pk.n_re)
-                                  * (Prop.g * Prop.d_h)**0.5)
-            bubble_vel = (0.5 * bubble_vel_between
-                          + (bubble_vel_between**2 + 13.59 * pk.oil_mu
-                             / (pk.ro_l * Prop.d_h**0.5))**0.5)
-
+            v_b_between = ((0.251 + 8.74 * 10**-6 * n_re_t)
+                           * (Prop.g * Prop.d_h)**0.5)
+            v_b = (0.5 * v_b_between
+                   + (v_b_between**2 + 13.59 * p_k.oil_mu
+                      / (p_k.ro_l * Prop.d_h**0.5))**0.5)
         # Check what function of liquid distribution coefficient (G) to use
-        if pk.v_t < 10:
+        if p_k.v_t < 10:
             if Prop.liq_phase == 'Oil':
-                g = (0.0127 * log(pk.oil_mu + 1) / Prop.d_h**1.415 - 0.284
-                     + 0.167 * log(pk.v_t) + 0.113 * log(Prop.d_h))
+                g = (0.0127 * log(p_k.oil_mu + 1) / Prop.d_h**1.415 - 0.284
+                     + 0.167 * log(p_k.v_t) + 0.113 * log(Prop.d_h))
             else:
-                g = (0.013 * log(pk.oil_mu) / Prop.d_h**1.38 - 0.681 + 0.232
-                     * log(pk.v_t) - 0.428 * log(Prop.d_h))
+                g = (0.013 * log(p_k.oil_mu) / Prop.d_h**1.38 - 0.681 + 0.232
+                     * log(p_k.v_t) - 0.428 * log(Prop.d_h))
         else:
             if Prop.liq_phase == 'Oil':
-                g = (0.0274 * log(pk.oil_mu + 1) / Prop.d_h**1.371) + 0.167 \
-                    + 0.569 * log(Prop.d_h) - log(pk.v_t) \
-                    * (0.01 * log(pk.oil_mu + 1)
+                g = (0.0274 * log(p_k.oil_mu + 1) / Prop.d_h**1.371) + 0.167 \
+                    + 0.569 * log(Prop.d_h) - log(p_k.v_t) \
+                    * (0.01 * log(p_k.oil_mu + 1)
                        / Prop.d_h**1.571 + 0.397 + 0.63 * log(Prop.d_h))
             else:
-                g = (0.045 * log(pk.oil_mu) / Prop.d_h**0.799 - 0.709
-                     - 0.162 * log(pk.v_t) - 0.888 * log(Prop.d_h))
+                g = (0.045 * log(p_k.oil_mu) / Prop.d_h**0.799 - 0.709
+                     - 0.162 * log(p_k.v_t) - 0.888 * log(Prop.d_h))
         # Constraint for G
-        if g < - 0.065 * pk.v_t:
-            g = - 0.065 * pk.v_t
-
+        if g < - 0.065 * p_k.v_t:
+            g = - 0.065 * p_k.v_t
         # Average density
-        aver_density = ((pk.w_t + pk.ro_l * bubble_vel * Prop.a)
-                        / (pk.q_t + bubble_vel * Prop.a) + g * pk.ro_l)
-        # Constraint for G
-        g_cond = ((-bubble_vel * Prop.a / (pk.q_t + bubble_vel * Prop.a))
-                  * (1 - aver_density / pk.ro_l))
-        if pk.v_t > 10 and g < g_cond:
-            g = (-bubble_vel * Prop.a / (pk.q_t + bubble_vel * Prop.a)
-                 * (1 - aver_density / pk.ro_l))
-            aver_density = ((pk.w_t + pk.ro_l * bubble_vel * Prop.a)
-                            / (pk.q_t + bubble_vel * Prop.a) + g * pk.ro_l)
+        aver_density = ((p_k.w_t + p_k.ro_l * v_b * Prop.a)
+                        / (p_k.q_t + v_b * Prop.a) + g * p_k.ro_l)
+        # Constraint for G (C-16)
+        g_cond = ((-v_b * Prop.a / (p_k.q_t + v_b * Prop.a))
+                  * (1 - aver_density / p_k.ro_l))
+        if p_k.v_t > 10 and g < g_cond:
+            g = g_cond
+            aver_density = ((p_k.w_t + p_k.ro_l * v_b * Prop.a)
+                            / (p_k.q_t + v_b * Prop.a) + g * p_k.ro_l)
         # Friction-loss term
-        friction_loss = (pk.moody_friction * pk.ro_l * pk.v_t**2
+        friction_loss = (moody_friction_t * p_k.ro_l * p_k.v_t**2
                          / (2 * Prop.g_c * Prop.d_h)
-                         * ((pk.q_l + bubble_vel * Prop.a)
-                            / (pk.q_t + bubble_vel * Prop.a) + g))
+                         * ((p_k.q_l + v_b * Prop.a)
+                            / (p_k.q_t + v_b * Prop.a) + g))
         return aver_density, friction_loss
 
     @staticmethod
-    def bubble(pk: PropertiesOfPart) -> tuple[float, float]:
+    def bubble(p_k: PropertiesOfPart) -> tuple[float, float]:
+        """Get average density and friction-loss term for bubble case"""
         # The following equations are in the Appendix C, BUBBLE FLOW.
         # Good approximation of an average slop velocity
         # in ft/sec for bubble regime
         v_s = 0.8
         # Void fraction of gas
-        void_fraction_of_gas = (0.5 * (1 + pk.q_t / (v_s * Prop.a)
-                                       - ((1 + pk.q_t / (v_s * Prop.a))**2
-                                          - 4 * pk.q_g / (v_s * Prop.a))**0.5))
+        fract_g = (0.5 * (1 + p_k.q_t / (v_s * Prop.a)
+                          - ((1 + p_k.q_t / (v_s * Prop.a))**2
+                             - 4 * p_k.q_g / (v_s * Prop.a))**0.5))
         # Average density
-        aver_density = ((1 - void_fraction_of_gas) * pk.ro_l
-                        + void_fraction_of_gas * pk.ro_g)
-        v_l = pk.q_l / (Prop.a * (1 - void_fraction_of_gas))
+        aver_density = ((1 - fract_g) * p_k.ro_l
+                        + fract_g * p_k.ro_g)
+        v_l = p_k.q_l / (Prop.a * (1 - fract_g))
+        # The Reynolds number for liquid and Moody friction
+        n_re_l = 1488 * p_k.ro_l * Prop.d_h * v_l / p_k.oil_mu
+        moody_friction_l = friction_factor(n_re_l, Prop.rel_rough)
         # Friction-loss term
-        friction_loss_term = (pk.moody_friction * v_l * v_l
+        friction_loss_term = (moody_friction_l * v_l**2
                               / (2 * Prop.g_c * Prop.d_h))
         return aver_density, friction_loss_term
 
     @staticmethod
     def transition(aver_density_slug: float, fric_loss_slug: float,
-                   aver_density_b: float, fric_loss_b: float,
-                   pk: PropertiesOfPart) -> tuple[float, float]:
+                   aver_density_m: float, fric_loss_m: float,
+                   p_k: PropertiesOfPart) -> tuple[float, float]:
+        """Get average density and friction-loss term for transition case"""
         # The following equations are in the Appendix C, TRANSITION FLOW.
         # Slug and mist boundary limits from the Appendix B
         # Average density
-        aver_density = (((pk.l_m - pk.v_d) / (pk.l_m - pk.l_s))
+        aver_density = (((p_k.l_m - p_k.v_d) / (p_k.l_m - p_k.l_s))
                         * aver_density_slug
-                        + ((pk.v_d - pk.l_s) / (pk.l_m - pk.l_s))
-                        * aver_density_b)
+                        + ((p_k.v_d - p_k.l_s) / (p_k.l_m - p_k.l_s))
+                        * aver_density_m)
         # Friction-loss term
-        frict_loss = (((pk.l_m - pk.v_d) / (pk.l_m - pk.l_s)) * fric_loss_slug
-                      + ((pk.v_d - pk.l_s) / (pk.l_m - pk.l_s)) * fric_loss_b)
+        frict_loss = (((p_k.l_m - p_k.v_d) / (p_k.l_m - p_k.l_s))
+                      * fric_loss_slug
+                      + ((p_k.v_d - p_k.l_s) / (p_k.l_m - p_k.l_s))
+                      * fric_loss_m)
         return aver_density, frict_loss
 
     @staticmethod
-    def mist(pk: PropertiesOfPart) -> tuple[float, float]:
+    def mist(p_k: PropertiesOfPart) -> tuple[float, float]:
+        """Get average density and friction-loss term for mist case"""
         # The following equations are in the appendix C, MIST FLOW.
-        # new q_g for this case
-        q_g = Prop.a * pk.l_m * (pk.ro_l / (Prop.g * Prop.sigma))**-0.25
-        void_fraction_of_gas = 1 / (1 + pk.q_l / q_g)
-        aver_density = ((1 - void_fraction_of_gas) * pk.ro_l
-                        + void_fraction_of_gas * pk.ro_g)
-        n_w = (4.52 * 10**-7 * (pk.v_g * pk.oil_mu / Prop.sigma)**2
-               * pk.ro_g / pk.ro_l)
-
+        # new more accurate vol flow for gas for mist flow
+        q_g = Prop.a * p_k.l_m * (p_k.ro_l / (Prop.g * Prop.sigma))**-0.25
+        # void fraction for gas
+        fract_g = 1 / (1 + p_k.q_l / q_g)
+        aver_density = ((1 - fract_g) * p_k.ro_l
+                        + fract_g * p_k.ro_g)
+        n_w = (4.52 * 10**-7 * (p_k.v_g * p_k.oil_mu / Prop.sigma)**2
+               * p_k.ro_g / p_k.ro_l)
+        # Choose right relative roughness
         if n_w < 0.005:
             relative_roughness = (34 * Prop.sigma
-                                  / (pk.ro_g * Prop.d_h * pk.v_g**2))
+                                  / (p_k.ro_g * Prop.d_h * p_k.v_g**2))
         else:
             relative_roughness = (174.8 * Prop.sigma * n_w**0.302
-                                  / (pk.ro_g * Prop.d_h * pk.v_g**2))
-
-        moody_friction = friction_factor(pk.n_re, relative_roughness)
-        friction_loss_term = (moody_friction * pk.ro_g * pk.v_g * pk.v_g
+                                  / (p_k.ro_g * Prop.d_h * p_k.v_g**2))
+        # The Reynolds number for gas and Moody friction
+        n_re_g = 1488 * p_k.ro_g * Prop.d_h * p_k.v_g / p_k.oil_mu
+        moody_friction_g = friction_factor(n_re_g, relative_roughness)
+        friction_loss_term = (moody_friction_g * p_k.ro_g * p_k.v_g * p_k.v_g
                               / (2 * Prop.g_c * Prop.d_h))
         return aver_density, friction_loss_term
 
     @staticmethod
-    def aver_density_friction_loss(pk: PropertiesOfPart) -> None:
-        # Evaluation of average density and friction-loss gradient
+    def aver_density_friction_loss(p_k: PropertiesOfPart) -> None:
+        """Evaluation of average density and friction-loss gradient"""
         orki = Orkiszewski
         # There is a certain way to get average density
         # and fiction-loss term for each flow type
-        if pk.flow_type == 'Slug':
+        if p_k.flow_type == 'Slug':
             # Average density, friction-loss term
-            aver_density, friction_loss = orki.slug(pk)
-        elif pk.flow_type == 'Bubble':
-            aver_density, friction_loss = orki.bubble(pk)
-        elif pk.flow_type == 'Transition':
-            aver_density_slug, fric_loss_slug = orki.slug(pk)
-            aver_density_b, fric_loss_b = orki.bubble(pk)
-            aver_density, friction_loss = orki.transition(aver_density_slug,
-                                                          fric_loss_slug,
-                                                          aver_density_b,
-                                                          fric_loss_b, pk)
-        else:
-            aver_density, friction_loss = orki.mist(pk)
-        pk.aver_density = aver_density
-        pk.friction_loss = friction_loss
-        return None
+            p_k.aver_density, p_k.friction_loss = orki.slug(p_k)
+        elif p_k.flow_type == 'Bubble':
+            p_k.aver_density, p_k.friction_loss = orki.bubble(p_k)
+        elif p_k.flow_type == 'Transition':
+            aver_density_slug, fric_loss_slug = orki.slug(p_k)
+            aver_density_m, fric_loss_m = orki.mist(p_k)
+            p_k.aver_density, p_k.friction_loss = orki.transition(
+                aver_density_slug, fric_loss_slug,
+                aver_density_m, fric_loss_m, p_k)
+        elif p_k.flow_type == 'Mist':
+            p_k.aver_density, p_k.friction_loss = orki.mist(p_k)
 
     @staticmethod
-    def depth_increment(pk: PropertiesOfPart) -> float:
-        return (144 * (pk.delta_p * (1 - pk.w_t * pk.q_g /
-                                     (4637 * Prop.a**2 * pk.ap))
-                       / (pk.aver_density + pk.friction_loss)))
+    def depth_increment(p_k: PropertiesOfPart) -> float:
+        """Get right depth increment"""
+        return (144 * (p_k.delta_p * (1 - p_k.w_t * p_k.q_g
+                                      / (4637 * Prop.a**2 * p_k.ap))
+                       / (p_k.aver_density + p_k.friction_loss)))
 
     @staticmethod
     def pressure_drop() -> tuple[list[float], list[float]]:
-        # Two phase pressure drops in vertical pipe
-        pk = PropertiesOfPart(0, Prop.p_w)
+        """Get two arrays of pressures and depths"""
+        p_k = PropertiesOfPart(0, Prop.p) if Prop.direction == 'down'\
+            else PropertiesOfPart(Prop.d, Prop.p)
         depth_list = list()
         pres_list = list()
         # Set api and d_h
-        Prop.api = Prop.api_grav()
+        Prop.api_grav()
         Prop.d_h = Prop.wetted_perimeter() if Prop.d_h == 0 else Prop.d_h
         # Set gas pseudo-critical properties
-        Prop.p_pc, Prop.t_pc = Prop.gas_pseudoprops()
-        # Diameter in meters
-        d = 0.3048 * 2 * (Prop.a / 3.14) ** 0.5
-        # Relative roughness
-        rel_rough = roughness_Farshad(Prop.material, d) / d
+        Prop.gas_pseudoprops()
+        # Set relative roughness
+        Prop.rel_roughness()
         # Surface tension, for oil, or water
         if Prop.liq_phase == "Oil":
             Prop.sigma = 0.075
         else:
             Prop.sigma = 0.159
-
-        while pk.d <= Prop.d:
-            # Set solution gas
-            pk.gas_oil_ratio()
+        while 0 <= p_k.d <= Prop.d:
+            # Set solution gas and pressure at bubble point
+            p_k.oil_pbubble()
+            p_k.gasoilratio()
             # Set pil formation volume factor
-            pk.oil_fvf()
+            p_k.oil_fvf()
             # Set live oil viscosity
-            pk.live_oil_mu()
+            p_k.live_oil_mu()
             # Set reduced pressure and reduced temperature, dimensionless
-            pk.tr_pr()
+            p_k.tr_pr()
             # Set gas compressibility
-            pk.gas_z_factor()
+            p_k.gas_z_factor()
             # Set corrected volumetric flow rates,
             # where q_g for gas, q_l for liquid, q_t for total
-            pk.volumetric_flow_rate()
+            p_k.volumetric_flow_rate()
             # Set corrected mass flow rates,
             # where w_g for gas, w_l for liquid, w_t for total
-            pk.mass_flows()
+            p_k.mass_flows()
             # Set corrected densities, where ro_g for gas, ro_l for liquid
-            pk.corrected_densities()
+            p_k.corrected_densities()
             # Set test variables from Appendix B. v_d - dimensionless
             # gas velocity, v_t - total fluid velocity, v_g = q_g/q_t
-            pk.velocities()
+            p_k.velocities()
             # Set flow type. Can be Mist, Bubble, Slug, Transition
-            pk.flow_regime()
-            # Set Reynolds number and moody friction factor
-            pk.moody_friction_n_re(rel_rough)
+            p_k.flow_regime()
             # Set average density, friction-loss term
-            Orkiszewski.aver_density_friction_loss(pk)
+            Orkiszewski.aver_density_friction_loss(p_k)
             # Fixing new conditions for the second iteration.
             # New current pressure and new current depth
-            new_d = pk.d + Orkiszewski.depth_increment(pk)
-            new_p = pk.p + pk.delta_p
+            new_d = p_k.d + Orkiszewski.depth_increment(p_k)
+            new_p = p_k.p + p_k.delta_p
             # Check whether calculated value of depth increment
-            # differ significantly from assumed depth increment.
-            if (new_d - pk.d < 0.99995 * pk.delta_d or
-                    new_d - pk.d > 1.00005 * pk.delta_d):
+            # differ significantly (more than 5 %)
+            # from assumed depth increment.
+            if (abs(new_d - p_k.d) < 0.95 * abs(p_k.delta_d) or
+                    abs(new_d - p_k.d) > 1.05 * abs(p_k.delta_d)):
                 # Correction
-                assum_increment = new_d - pk.d
-                pk = PropertiesOfPart(pk.d, pk.p, assum_increment)
+                assum_increment = new_d - p_k.d
+                p_k = PropertiesOfPart(p_k.d, p_k.p, assum_increment)
             else:
-                depth_list.append(pk.d)
-                pres_list.append(pk.p)
+                depth_list.append(p_k.d)
+                pres_list.append(p_k.p)
                 # Next step
-                pk = PropertiesOfPart(new_d, new_p)
+                p_k = PropertiesOfPart(new_d, new_p)
         return depth_list, pres_list
-
-
-pass

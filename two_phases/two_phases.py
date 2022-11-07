@@ -1,13 +1,18 @@
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+
 from .utils import PropertiesOfWholeSystem as Prop
 from .orkiszewski_model import Orkiszewski as Orkis
 
-# здесь совсем не совпадает со статье что-то,
-# там сто проц ошибка в Г и квадратные скобки это целое?
-
 
 class TwoPhase:
-    # ======================== Callbacks ================================
+    """
+    This class can plot graph, output lists of data (pressure and depth lists)
+    and pressure drop.
+    User is supposed to use only this class.
+    (Setting params is allowed only here)
+    """
+    # ========================== Callbacks ====================================
 
     @property  # t_w [°F] -> Temperature in the wellhead
     def t_w(self) -> float:
@@ -17,13 +22,14 @@ class TwoPhase:
     def t_w(self, value: float):
         Prop.t_w = value
 
-    @property  # p_w [psia] -> Pressure in the wellhead
-    def p_w(self) -> float:
-        return Prop.p_w
+    @property  # p [psia] -> Pressure in the wellhead(if down)
+    # or in the bottom(if up)
+    def p(self) -> float:
+        return Prop.p
 
-    @p_w.setter  # p_w [psia] -> Pressure in the wellhead
-    def p_w(self, value: float):
-        Prop.p_w = value
+    @p.setter  # p [psia] -> Pressure in the wellhead or in the bottom
+    def p(self, value: float):
+        Prop.p = value
 
     @property  # t_r [°F] -> Temperature in the reservoir
     def t_r(self) -> float:
@@ -41,21 +47,25 @@ class TwoPhase:
     def q_o(self, value: float):
         Prop.q_o = value
 
-    @property   # mu_d100F [cp] -> Dead Oil Viscosity at 100F
-    def mu_d100f(self) -> float:
-        return Prop.mu_d100f
+    @property   # [cp] -> Dead Oil Viscosity
+    # at different temperature points (from t_f list)
+    def dead_mu(self) -> list[float]:
+        return Prop.dead_mu
 
-    @mu_d100f.setter   # mu_d100F [cp] -> Dead Oil Viscosity at 100F
-    def mu_d100f(self, value: float):
-        Prop.mu_d100f = value
+    @dead_mu.setter   # [cp] -> Dead Oil Viscosity
+    # at different temperature points (from t_f list)
+    def dead_mu(self, value: list[float]):
+        Prop.dead_mu = value
 
-    @property  # mu_d210F [cp] -> Dead Oil Viscosity at 210F
-    def mu_d210f(self) -> float:
-        return Prop.mu_d210f
+    @property  # [°F] -> Temperatures, where dead oil viscosity values
+    # were measured
+    def t_f(self) -> list[float]:
+        return Prop.t_f
 
-    @mu_d210f.setter  # mu_d210F [cp] -> Dead Oil Viscosity at 210F
-    def mu_d210f(self, value: float):
-        Prop.mu_d210f = value
+    @t_f.setter  # [°F] -> Temperatures, where dead oil viscosity values
+    # were measured
+    def t_f(self, value: list[float]):
+        Prop.t_f = value
 
     @property  # Oil specific gravity
     def sg_o(self) -> float:
@@ -111,17 +121,28 @@ class TwoPhase:
 
     @material.setter  # Material of the tube
     def material(self, value: str):
-        if value != ('Plastic coated' or value != 'Carbon steel, honed bare' or
-                     value != "Cr13, electropolished bare" or
-                     value != "Cement lining" or
-                     value != 'Carbon steel, bare' or 'Fiberglass lining' or
-                     'Cr13, bare'):
+        if (value == 'Plastic coated' or value == 'Carbon steel, honed bare'
+                or value == "Cr13, electropolished bare"
+                or value == "Cement lining" or value == 'Carbon steel, bare'
+                or value == 'Fiberglass lining' or value == 'Cr13, bare'):
+            Prop.material = value
+        else:
             raise ValueError("Pipe material can only be 'Plastic coated', "
-                             "'Carbon steel honed bare',"
+                             "'Carbon steel, honed bare',"
                              "'Cr13, electropolished bare', "
                              "'Cement lining', 'Carbon steel, bare', "
                              "'Fiberglass lining', 'Cr13, bare'")
-        Prop.material = value
+
+    @property  # Direction toward the needing point
+    def direction(self) -> str:
+        return Prop.direction
+
+    @direction.setter  # Direction toward the needing point
+    def direction(self, value: str):
+        if value != 'up' and value != 'down':
+            raise ValueError("Direction can only be 'up' "
+                             "or 'down'")
+        Prop.direction = value
 
     @property  # Liquid phase
     def liq_phase(self) -> str:
@@ -129,29 +150,39 @@ class TwoPhase:
 
     @liq_phase.setter  # Liquid phase
     def liq_phase(self, value: str):
-        if Prop.liq_phase != 'Water' or Prop.liq_phase != 'Oil':
-            raise ValueError("Liquid phase can only be 'Water' or 'Oil'")
+        if Prop.liq_phase != 'Oil':
+            raise ValueError("Liquid phase can only be 'Water' or 'Oil. "
+                             "Because for water some correlations "
+                             "may not work correctly'")
         Prop.liq_phase = value
     # ================================ Output =================================
 
     @staticmethod
-    def get_pressures_and_depths() -> tuple[list[float], list[float]]:
-        """
-        Get list of pressure values and depth values
-        """
+    def get_data() -> tuple[list[float], list[float]]:
+        """Get lists of depth values in [FT] and pressure values in [PSIA]"""
         return Orkis.pressure_drop()
 
     @staticmethod
+    def get_pressure_drop() -> int:
+        """Get approximate pressure drop in [PSIA] at the input point"""
+        depth_list, pres_list = TwoPhase.get_data()
+        return pres_list[-1] - Prop.p
+
+    @staticmethod
     def plot() -> None:
-        """
-        Plot a graph Depth - [FT] vs Pressure - [psia]
-        """
-        tp = TwoPhase
+        """Plot a graph Depth - [FT] vs Pressure - [psia]"""
+        depth_list, pres_list = TwoPhase.get_data()
+
+        fig = plt.figure(figsize=(6, 9))
+        ax = fig.add_subplot()
+
+        ax.grid(linewidth=1)
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(200))
         plt.gca().invert_yaxis()
-        depth_list, pres_list = tp.get_pressures_and_depths()
-        plt.scatter(pres_list, depth_list)
+
+        plt.xlabel("PRESSURE - PSIA")
+        plt.ylabel("DEPTH - FT")
+        plt.title("Calculated Pressure Drop", fontsize=15)
+
+        ax.plot(pres_list, depth_list, color='b')
         plt.show()
-        return None
-
-
-pass
