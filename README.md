@@ -1,10 +1,8 @@
-# Two-phase flow
+# Orkiszewski model
 
-The `two-phase` flow is a Python library that implements two-phase flows models and make easy to get the flow properties such as flow pattern, elongated bubble velocity, homogenous model properties etc. This library is structured in a way that the user can program using a simple and easy-to-use objects or in a more advanced manner can use the functions of the library directly.
+This program implements Orkiszewski model and make easy to get the drop pressure and plot the graph (Depth [FT] vs Pressure [PSIA]). You are supposed to use only the single class TwoPhase() to input properties and get all important output from the model (the graph,the pressure drop).
 
-The fluid properties are by default automatically obtained from the [CoolProp](https://github.com/CoolProp/CoolProp). However, you can also pass your own functions, determined experimentally or from any source you want.
-
-The library has also some basic plot utils for some flow pattern maps.
+Moody pipe relative roughness factor and friction factor are obtained from the [fluids](https://fluids.readthedocs.io/). 
 
 ## Usage
 
