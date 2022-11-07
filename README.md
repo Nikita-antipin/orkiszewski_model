@@ -6,14 +6,6 @@ The fluid properties are by default automatically obtained from the [CoolProp](h
 
 The library has also some basic plot utils for some flow pattern maps.
 
-## Installation
-
-Use the package manager [pip](https://pip.pypa.io/en/stable/) to install `two-phase` flow package.
-
-```bash
-pip install two-phase
-```
-
 ## Usage
 
 ```python
@@ -50,32 +42,10 @@ print(two_phase.get_pressure_drop())
 two_phase.plot()
 ```
 
-## Roadmap
+## Plan
 
-- [x] CoolProp integration
-- [x] Homogeneous model
-- [x] Elongated bubble models
-- [x] Taitel 1980 - flow pattern map for vertical flows (being developed)
-- [ ] Flow pattern map for horizontal flows
-- [ ] Lockhart Martinelli model
-- [ ] Alves Anular Flow model
-- [ ] Taitel and Barnea model
-- [ ] Drift model
-- [ ] Beggs and Brill model
-- [ ] Hagedorn Brown model
-- [ ] Black oil model
+- [ ] Add water option
 
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change or add.
-
-When contributing, please use the [black](https://github.com/psf/black) code formatter as it formats the code to looks the  same regardless of the project you are reading.
-
-Please make sure to update tests as appropriate.
-
-## Credits
-
-[@felipecastrotc](https://github.com/felipecastrotc/)
-
-## License
-[GPLv3](https://choosealicense.com/licenses/gpl-3.0/)
