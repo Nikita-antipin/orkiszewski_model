@@ -1,6 +1,6 @@
 # Orkiszewski model
 
-This program implements Orkiszewski model and make easy to get the drop pressure and plot the graph (Depth [FT] vs Pressure [PSIA]). You are supposed to use only the single class TwoPhase() to input properties and get all important output from the model (the graph,the pressure drop).
+This program implements Orkiszewski model and makes easy to get the drop pressure and plot the graph (Depth [FT] vs Pressure [PSIA]). You are supposed to use only the single class TwoPhase() to input properties and get all important output from the model (the graph,the pressure drop).
 
 Moody pipe relative roughness factor and friction factor are obtained from the [fluids](https://fluids.readthedocs.io/). 
 
